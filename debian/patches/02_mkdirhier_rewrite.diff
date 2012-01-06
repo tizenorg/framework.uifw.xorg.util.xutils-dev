@@ -1,0 +1,314 @@
+$Id: 099u_mkdirhier_rewrite.diff 480 2005-08-02 20:14:26Z branden $
+
+Reimplement mkdirhier; see Debian #141347 and #232357 for some reasons why.
+
+This shell script and manpage by Branden Robinson.
+
+Not submitted upstream to XFree86 or X.Org.
+
+Index: a/imake/mkdirhier
+===================================================================
+--- a/imake/mkdirhier	(revision 309)
++++ b/imake/mkdirhier	(working copy)
+@@ -1,67 +1,94 @@
+ #!/bin/sh
+-# $Xorg: mkdirhier.sh,v 1.3 2000/08/17 19:41:53 cpqbld Exp $
+-# Courtesy of Paul Eggert
+ 
+-newline='
+-'
+-IFS=$newline
++# Copyright 2005 Branden Robinson.
+ 
+-case ${1--} in
+--*) echo >&2 "mkdirhier: usage: mkdirhier directory ..."; exit 1
+-esac
++# Permission is hereby granted, free of charge, to any person obtaining a
++# copy of this software and associated documentation files (the "Software"),
++# to deal in the Software without restriction, including without limitation
++# the rights to use, copy, modify, merge, publish, distribute, sublicense,
++# and/or sell copies of the Software, and to permit persons to whom the
++# Software is furnished to do so, subject to the following condition:
++#
++#     The above copyright notice and this permission notice shall be
++#     included in all copies or substantial portions of the Software.
++#
++# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
++# SOFTWARE IN THE PUBLIC INTEREST, INC. BE LIABLE FOR ANY CLAIM, DAMAGES OR
++# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
++# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
++# DEALINGS IN THE SOFTWARE.
+ 
+-status=
++# I rewrote Paul Eggert's script in POSIX shell because it was a little
++# odd, and did not confine itself to puritantical pre-POSIX conventions.
++# For example, in one place it used:
++#   case ${1--} in
++#   -*)
++# to test for $1 being null, presumably due to fears that test -n and -z
++# will not be available.  Yet later in the script, test -n was used.
++#
++# This seemed quite silly.  I decided to rewrite it since I am arrgoant
++# enough to think I know what I'm doing in POSIX shell.
++#
++# If someone needs a pre-POSIX version of mkdirhier, they'll probably need to
++# turn to someone else, as I have no idea where such a thing is specified.
+ 
+-for directory
+-do
+-	case $directory in
+-	'')
+-		echo >&2 "mkdirhier: empty directory name"
+-		status=1
+-		continue;;
+-	*"$newline"*)
+-		echo >&2 "mkdirhier: directory name contains a newline: \`\`$directory''"
+-		status=1
+-		continue;;
+-	///*) prefix=/;; # See Posix 2.3 "path".
+-	//*) prefix=//;;
+-	/*) prefix=/;;
+-	-*) prefix=./;;
+-	*) prefix=
+-	esac
++set -e
+ 
+-	IFS=/
+-	set x $directory
+-	case $2 in
+-	    */*)	# IFS parsing is broken
+-		IFS=' '
+-		set x `echo $directory | tr / ' '`
+-		;;
+-	esac
+-	IFS=$newline
+-	shift
++PROGNAME=${0##*/}
++STATUS=0
+ 
+-	for filename
+-	do
+-		path=$prefix$filename
+-		prefix=$path/
+-		shift
++usage() {
++    cat <<EOF
++usage: $PROGNAME DIRECTORY ...
++Create each directory DIRECTORY, also creating intermediate directories in the
++specified hierarchy as necessary.
+ 
+-		test -d "$path" || {
+-			paths=$path
+-			for filename
+-			do
+-				if [ -n "$filename" -a "$filename" != "." ]; then
+-					path=$path/$filename
+-					paths=$paths$newline$path
+-				fi
+-			done
++Note: Use "mkdir -p" instead of "$PROGNAME" if the system supports it.
++EOF
++}
+ 
+-			mkdir $paths || status=$?
++makedir () {
++    FUNC_STATUS=0
++    # Does the desired directory already exist?
++    if ! [ -d "$1" ]; then
++        # Is a directory hierarchy specified (i.e., are any slashes in the
++        # argument)?
++        PARENT=${1%/*}
++        if [ -n "$PARENT" ] && [ "$PARENT" != "$1" ]; then
++            # Yes; does the desired directory's immediate parent exist?
++            if ! [ -d "$PARENT" ]; then
++                # No; push it onto the stack.  If that fails, return
++                # immediately, as we know later calls will also fail.  E.g., if
++                # we are asked to create /usr/bin/foo/bar/baz/quux and
++                # /usr/bin/foo fails, we don't have to even try anything deeper
++                # in the hierarchy.
++                if ! makedir "$PARENT"; then
++                    return $FUNC_STATUS
++                fi
++            fi
++        fi
++        mkdir "$1" || FUNC_STATUS=$?
++    fi
++    return $FUNC_STATUS
++}
+ 
+-			break
+-		}
+-	done
+-  done
++if [ -z "$1" ]; then
++    usage >&2
++    exit 64
++fi
+ 
+-exit $status
++while [ -n "$1" ]; do
++    ARG="$1"
++    makedir "$ARG" || \
++    {
++        STATUS=$?
++        echo "$PROGNAME: could not create directory \"$ARG\"" >&2
++    }
++    shift
++done
++
++exit $STATUS
++
++# vim:set ai et sts=4 sw=4 tw=80:
+Index: a/imake/mkdirhier.man
+===================================================================
+--- a/imake/mkdirhier.man	(revision 309)
++++ b/imake/mkdirhier.man	(working copy)
+@@ -1,42 +1,111 @@
+-.\" $Xorg: mkdirhier.man,v 1.4 2001/02/09 02:03:17 xorgcvs Exp $
+-.\" Copyright (c) 1993, 1994, 1998 The Open Group
+-.\" 
+-.\" Permission to use, copy, modify, distribute, and sell this software and its
+-.\" documentation for any purpose is hereby granted without fee, provided that
+-.\" the above copyright notice appear in all copies and that both that
+-.\" copyright notice and this permission notice appear in supporting
+-.\" documentation.
+-.\" 
+-.\" The above copyright notice and this permission notice shall be included in
+-.\" all copies or substantial portions of the Software.
+-.\" 
++.\" Copyright 2005 Branden Robinson.
++.\"
++.\" Permission is hereby granted, free of charge, to any person obtaining a
++.\" copy of this software and associated documentation files (the "Software"),
++.\" to deal in the Software without restriction, including without limitation
++.\" the rights to use, copy, modify, merge, publish, distribute, sublicense,
++.\" and/or sell copies of the Software, and to permit persons to whom the
++.\" Software is furnished to do so, subject to the following condition:
++.\"
++.\"     The above copyright notice and this permission notice shall be
++.\"     included in all copies or substantial portions of the Software.
++.\"
+ .\" THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ .\" IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+-.\" FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL 
+-.\" THE OPEN GROUP BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+-.\" WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF 
+-.\" OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+-.\" SOFTWARE.
+-.\" 
+-.\" Except as contained in this notice, the name of The Open Group shall not 
+-.\" be used in advertising or otherwise to promote the sale, use or other 
+-.\" dealing in this Software without prior written authorization from The 
+-.\" Open Group.
+-.\"
+-.\" $XFree86: xc/config/util/mkdirhier.man,v 1.2 2001/01/27 18:19:55 dawes Exp $
+-.\"
+-.TH MKDIRHIER 1 __xorgversion__
++.\" FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
++.\" SOFTWARE IN THE PUBLIC INTEREST, INC. BE LIABLE FOR ANY CLAIM, DAMAGES OR
++.\" OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
++.\" ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
++.\" DEALINGS IN THE SOFTWARE.
++.TH mkdirhier 1  __xorgversion__
+ .SH NAME
+-mkdirhier \- makes a directory hierarchy
++mkdirhier \- create a directory hierarchy
+ .SH SYNOPSIS
+ .B mkdirhier
+-directory ...
++.I directory
++\&...
+ .SH DESCRIPTION
+-The
+-.I mkdirhier
+-command creates the specified directories. Unlike
+-.I mkdir
+-if any of the parent directories of the specified directory
+-do not exist, it creates them as well.
++.B mkdirhier
++creates the specified directories.
++Unlike some versions of
++.BR mkdir ,
++if any of the parent directories of the specified directory do not exist,
++.B mkdirhier
++creates them as well.
++.PP
++.B mkdirhier
++is a wrapper for
++.BR mkdir ;
++systems with
++.BR mkdir (__osmansuffix__)
++implementations conformant with the Single Unix Specification may simply
++use
++.B mkdir \-p
++instead \(em this includes all systems using the GNU Core Utilities'
++version of
++.BR mkdir .
++.SH DIAGNOSTICS
++If
++.B mkdirhier
++is not supplied with any arguments, a usage message is printed.
++.PP
++.B mkdirhier
++prefixes its diagnostic messages with the name under which it was invoked,
++followed by a colon (\(oq:\(cq) so that its messages can be distinguished
++from others.
++.TP
++.B could not create directory \(dq\fIdirectory\fP\(dq
++indicates that there was a failure while creating
++.IR directory .
++This message will likely be preceded by a diagnostic message from
++.BR mkdir .
++.SH "EXIT STATUS"
++.TP
++.B 64
++.B mkdirhier
++was not given any directory names to create.
++.PP
++.B mkdirhier
++otherwise exits with the exit status of the last
++.B mkdir
++command that failed.
++.SH BUGS
++.B mkdirhier
++does not create all the requested directories as an atomic operation;
++therefore, it is is susceptible to race conditions.
++For example, if
++.B mkdirhier
++is directed to create a hierarchy
++.I a/b/c/d
++and any of
++.IR a/ ,
++.IR b/ ,
++or
++.I c/
++do not yet exist, any of the newly-created directories can be removed
++and/or replaced by a symbolic link to another location in the window of
++time after
++.B mkdirhier
++creates a directory and the directory immediately below it.
++This means that failures can be provoked (since
++.B mkdir
++will fail to create a directory in a directory that does not already
++exist),
++or directories may be created in unexpected locations.
++The same limitation holds for multiple directory arguments to
++.BR mkdirhier ;
++given two arguments
++.I a/b/c/d
++and
++.IR a/b/c/f ,
++it is possible for the directory hierarchy
++.I a/b/c
++to be disrupted in the time between the processing of the two arguments.
++To avoid these problems, use
++.B mkdir \-p
++instead, or do not use
++.B mkdirhier
++to create directories in parts of the filesystem where untrusted users can
++manipulate them.
+ .SH "SEE ALSO"
+-mkdir(1)
++.BR mkdir (__osmansuffix__)
