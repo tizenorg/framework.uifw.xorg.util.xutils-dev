@@ -1,5 +1,5 @@
 AC_PREREQ([2.60])
-AC_INIT([makedepend], [1.0.3],
+AC_INIT([makedepend], [1.0.4],
         [https://bugs.freedesktop.org/enter_bug.cgi?product=xorg])
 AM_INIT_AUTOMAKE([foreign dist-bzip2])
 AM_CONFIG_HEADER([makedepend-config.h])
@@ -24,7 +24,7 @@ dnl Use 64-bit file operations on 32-bit systems that support them
 AC_SYS_LARGEFILE
 
 dnl Check for pkg-config packages
-#PKG_CHECK_MODULES(X, [xproto])
+PKG_CHECK_MODULES(X, [xproto])
 AC_SUBST(X_CFLAGS)
 
 AC_OUTPUT([Makefile])
