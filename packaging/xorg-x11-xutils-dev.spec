@@ -57,3 +57,4 @@ rm -rf %{buildroot}
 %{_datadir}/aclocal/*
 %{_datadir}/pkgconfig/*
 /usr/share/license/%{name}
+
