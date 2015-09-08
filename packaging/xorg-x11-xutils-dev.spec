@@ -2,7 +2,7 @@ Name:	 xorg-x11-xutils-dev
 Summary: X.Org build utilities
 Version: 7.7
 Release: 1
-License: MIT/X11
+License: MIT
 Group:   Development/System
 URL:     http://www.x.org
 Source: %{name}-%{version}.tar.gz
@@ -36,6 +36,8 @@ Description: %{summary}
 
 %install
 rm -rf %{buildroot}
+mkdir -p %{buildroot}/usr/share/license
+cp -af COPYING %{buildroot}/usr/share/license/%{name}
 # Install all xutils
 {
    for xutil in %{DEF_SUBDIRS} ; do
@@ -54,4 +56,5 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{_datadir}/aclocal/*
 %{_datadir}/pkgconfig/*
+/usr/share/license/%{name}
 
